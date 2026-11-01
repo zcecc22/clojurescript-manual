@@ -2,7 +2,7 @@
 
 A working reference for ClojureScript on Node, written for people who already program well in an imperative language.
 
-**Targets ClojureScript 1.12.145, built with shadow-cljs 3.5.8, running on Node 20.19.2** (JDK 21 for the compiler). Anything that needs a specific version is marked inline in the source, e.g. `<!-- CLJS 1.12+ -->`. Every version-gated claim was checked against that real install rather than recalled.
+**Targets ClojureScript 1.12.145, built with shadow-cljs 3.5.8, running on Node 20.19.2** (JDK 21 for the compiler). Anything that needs a recent version is marked inline in the source, e.g. `<!-- CLJS 1.12+ -->`. The markers come from the release notes. The behaviour itself was checked against that real install rather than recalled.
 
 **Node, compiled with shadow-cljs. Nothing else.** No browser, no nbb, no self-hosted ClojureScript. The output of every example is a Node script.
 
