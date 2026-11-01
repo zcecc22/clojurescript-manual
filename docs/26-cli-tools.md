@@ -24,6 +24,10 @@ The skeleton: `main` receives the arguments as strings, calls an async `run`, an
             ["node:child_process" :as cp]
             [clojure.string :as str]))
 
+(defn ^:async run [args]
+  ;; Parse flags, do the work, write the results: the sections below fill this in.
+  (.write js/process.stdout (str (count args) " arguments\n")))
+
 (defn main [& args]
   (-> (run args)
       (.catch (fn [e]

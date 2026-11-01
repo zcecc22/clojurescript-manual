@@ -27,11 +27,20 @@ The single-arity form is what you'll write most:
 
 The body's last expression is the return value. There's no `return` keyword.
 
-Calling with the wrong number of arguments is a compiler warning where the compiler can see it, and an error at runtime:
+Calling a **multi-arity** function with an arity it doesn't have is a compiler warning where the compiler can see it, and an error at runtime:
 
 ```clojure
 (greet 1 2)   ;; Throws: Invalid arity: 2
 ```
+
+> ⚠️ **Gotcha:** A function with a **single** arity doesn't check at runtime. It compiles to a plain JavaScript function, and JavaScript ignores extra arguments:
+>
+> ```clojure
+> (defn one [x] [:one x])
+> (apply one [1 2])   ;; => [:one 1]    the 2 is silently dropped
+> ```
+>
+> A direct call like `(one 1 2)` at least produces a compiler warning. Through `apply`, a callback or a JS caller there's nothing, so treat the warnings as errors (chapter 21).
 
 > **Coming from imperative languages:** Functions are values, the same as numbers. `defn` is shorthand for `(def greet (fn [...] ...))`: it creates an anonymous function and binds a name to it. Passing functions to functions is routine here, not an advanced technique.
 

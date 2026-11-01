@@ -9,8 +9,8 @@
 Node 20 has the WHATWG `fetch` as a global. No require, no library:
 
 ```clojure
-(defn ^:async get-json [url]
-  (let [^js res (await (js/fetch url))]
+(defn ^:async get-json [url & [opts]]
+  (let [^js res (await (js/fetch url opts))]
     (when-not (.-ok res)
       (throw (ex-info (str "HTTP " (.-status res))
                       {:type   :http-error
@@ -21,7 +21,7 @@ Node 20 has the WHATWG `fetch` as a global. No require, no library:
 (await (get-json (str base "/json")))   ;; => {:id 1, :name "Ada"}
 ```
 
-Two awaits: `fetch` resolves as soon as the **headers** arrive, and `.json` or `.text` reads the body. The `^js` hint on `res` keeps its property names intact in a release build (chapter 22).
+Two awaits: `fetch` resolves as soon as the **headers** arrive, and `.json` or `.text` reads the body. `opts` is passed straight to `fetch`, for a method, headers or a signal. The `^js` hint on `res` keeps its property names intact in a release build (chapter 22).
 
 ---
 
@@ -146,7 +146,7 @@ So there are three kinds of failure, and they want different handling:
 
 ## Putting it together
 
-A robust JSON GET combines the pieces: timeout, status check, and the `retry` helper from chapter 14, retrying only what's transient:
+A robust JSON GET combines the pieces: a timeout per attempt, the status check in `get-json`, and the `retry` helper from chapter 14 with a `:retry?` predicate, so only transient failures are retried:
 
 ```clojure
 (defn transient? [^js e]
@@ -156,10 +156,18 @@ A robust JSON GET combines the pieces: timeout, status check, and the `retry` he
         (and (= type :http-error) (or (= status 429) (>= status 500))))))
 
 (defn ^:async get-json-robust [url]
-  (await (retry (fn [] (get-json url)) {:attempts 3 :base-ms 200})))
+  (await (retry (fn [] (get-json url #js {:signal (js/AbortSignal.timeout 5000)}))
+                {:attempts 3 :base-ms 200 :retry? transient?})))
 ```
 
-Wire `transient?` into `retry`'s catch to rethrow non-transient errors immediately.
+The signal is created inside the `fn`, so each attempt gets its own five seconds. A signal created once outside would already have fired by the second attempt. Against a test server (with a 100 ms timeout):
+
+| Endpoint | Result | Attempts |
+|---|---|---|
+| 404 | fails with `"HTTP 404"` | 1, not retried |
+| 503 twice, then 200 | succeeds | 3 |
+| never answers | fails with `TimeoutError` | 3 |
+| connection refused | fails with `"fetch failed"` | 3 |
 
 ---
 

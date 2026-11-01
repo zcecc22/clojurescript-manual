@@ -70,6 +70,10 @@ A helper for JSON responses, and a router that's just a function:
    :headers {"content-type" "application/json"}
    :body    (js/JSON.stringify (clj->js data))})
 
+(defn parse-json [s]
+  (try (js->clj (js/JSON.parse s) :keywordize-keys true)
+       (catch :default _ nil)))
+
 (def users (atom {1 {:id 1 :name "Ada"}}))
 
 (defn router [{:keys [method path body]}]
@@ -81,12 +85,15 @@ A helper for JSON responses, and a router that's just a function:
                           (json 200 u)
                           (json 404 {:error "not found"}))
                         (json 200 (vals @users)))
-      [:post "users"] (let [u  (js->clj (js/JSON.parse body) :keywordize-keys true)
-                            id (inc (apply max (keys @users)))]
-                        (swap! users assoc id (assoc u :id id))
-                        (json 201 (get @users id)))
+      [:post "users"] (if-let [u (parse-json body)]
+                        (let [id (inc (reduce max 0 (keys @users)))]
+                          (swap! users assoc id (assoc u :id id))
+                          (json 201 (get @users id)))
+                        (json 400 {:error "body is not valid JSON"}))
       (json 404 {:error "no route" :path path}))))
 ```
+
+Bad input from the client is a 400, not a crash: `parse-json` returns `nil` for a body that isn't JSON. `(reduce max 0 ...)` rather than `(apply max ...)` keeps the id calculation working when the store is empty, because `(apply max [])` throws.
 
 `case` on a vector of `[method first-segment]` is a compact router for a small service. It dispatches on literal constants (chapter 05), and the default clause is the 404. A larger service can use a map of routes, or a multimethod dispatching on `[method route-name]` (chapter 16).
 
@@ -128,19 +135,26 @@ With `->`, the last wrapper is the outermost: a request passes through logging, 
 
 (defn start! [port]
   (let [server (http/createServer
-                 (fn [req res]
+                 (fn [req ^js res]
                    (.catch (handle req res)
-                           (fn [e] (prn :fatal e) (.end res)))))]
+                           (fn [e]
+                             (prn :fatal (ex-message e))
+                             (when-not (.-headersSent res)
+                               (set! (.-statusCode res) 500))
+                             (.end res)))))]
     (js/Promise. (fn [resolve _] (.listen server port #(resolve server))))))
 ```
 
-The `.catch` matters: `handle` is async, and an unhandled rejection would crash the server (chapter 12). Exercised with `fetch` (chapter 25):
+The `.catch` matters: `handle` is async, and an unhandled rejection would crash the server (chapter 12). It also has to set the status. A bare `(.end res)` sends Node's default, **200 OK** with an empty body, so a client would treat a crash as success. With the status set, an error thrown outside `wrap-errors` reached the client as a 500.
+
+Exercised with `fetch` (chapter 25):
 
 ```
 get /health -> 200          [200 {:ok true}]
 get /users/1 -> 200         [200 {:id 1, :name "Ada"}]
 get /users/99 -> 404        [404 {:error "not found"}]
 post /users -> 201          [201 {:name "Bob", :id 2}]
+post /users -> 400          [400 {:error "body is not valid JSON"}]   body "{bad"
 get /boom -> 500            [500 {:error "internal error"}]
 get /nope -> 404            [404 {:error "no route", :path "/nope"}]
 ```
@@ -176,11 +190,15 @@ Combined with signal handling (chapter 14):
   (doseq [sig ["SIGINT" "SIGTERM"]]
     (.once js/process sig
            (fn []
-             (.close server #(js/process.exit 0))
+             (.close server #(prn :closed))
              (.unref (js/setTimeout #(js/process.exit 1) 10000))))))
 ```
 
+Once the server has closed, nothing holds the event loop and the process exits by itself with code 0. Tested with a request in flight when `SIGTERM` arrived, the request completed, 5,000,000 bytes of piped output all arrived, and the exit code was 0. Calling `process.exit` in the close callback would risk cutting that output short (chapter 26).
+
 The timer is the deadline. If connections don't drain in ten seconds, the process exits anyway, and `.unref` stops the timer from keeping a cleanly-closed process alive.
+
+> ⚠️ **Gotcha:** A keep-alive connection that becomes idle *after* `.close` isn't closed straight away. It stays open until it times out. In that test, `.close` called back about 3 seconds after the last response, when the client dropped its idle socket. The server-side limit is `server.keepAliveTimeout` (5 seconds by default), so keep the deadline comfortably above it.
 
 ---
 

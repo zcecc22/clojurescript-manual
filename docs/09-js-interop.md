@@ -40,7 +40,7 @@ Reading a missing property gives `undefined`, which ClojureScript treats as `nil
 Node's globals are available under `js/`:
 
 ```clojure
-(.-HOME js/process.env)    ;; => "/home/zcecc22"
+(.-HOME js/process.env)    ;; => "/home/you"
 (exists? js/window)        ;; => false   safe test for a global that may not exist
 ```
 

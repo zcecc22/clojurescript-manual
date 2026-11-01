@@ -58,10 +58,12 @@ The common codes are `ENOENT` (doesn't exist), `EACCES` (permission denied), `EE
 When you only need to know whether a path exists, `access` rejects if it doesn't:
 
 ```clojure
-(defn ^:async exists? [p]
+(defn ^:async path-exists? [p]
   (try (await (fsp/access p)) true
        (catch :default _ false)))
 ```
+
+Don't call it `exists?`. That name is already taken by a `cljs.core` macro (chapter 09), and redefining it produces an `exists? already refers to: cljs.core/exists?` warning, which `:warnings-as-errors` turns into a failed build.
 
 ---
 

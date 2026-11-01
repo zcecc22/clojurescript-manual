@@ -29,8 +29,7 @@ Everything defined with `def` or `defn` is public by default. `defn-` (and `^:pr
 
 ```clojure
 (ns app.main
-  (:require [app.util.text :as text]                 ; alias
-            [app.util.text :refer [shout]]           ; bring names in unqualified
+  (:require [app.util.text :as text :refer [shout]]  ; alias, plus one name unqualified
             [clojure.set :refer [union] :rename {union set-union}]
             [app.shared :as shared]))
 

@@ -105,7 +105,7 @@ A keyword lookup goes through protocol dispatch, while a JS property read is a s
 | `.join` on a JS array | 1.6 ms |
 | `(apply str (repeat 100000 "x"))` | 4.8 ms |
 
-Repeated concatenation is fast in V8, which builds ropes rather than copying. `apply str` over a lazy sequence pays for the sequence. For large text, collect parts in a JS array and `.join` them, or concatenate directly.
+Repeated concatenation is fast in V8, which builds ropes rather than copying. `apply str` over a lazy sequence pays for the sequence. For large text, concatenate directly or `.join` a JS array of parts. Both are fine. What to avoid is `apply str` over a long lazy sequence.
 
 ---
 

@@ -138,7 +138,7 @@ Stateful transducers that buffer, like `partition-all`, use the completion arity
 
 ### `completing`
 
-`transduce` calls the reducing function's completion arity at the end. A plain two-argument function like `+` already has one. For your own, `completing` adds it, optionally with a finishing function:
+`transduce` calls the reducing function's completion arity at the end. `+` already has one, because it accepts any number of arguments and `(+ acc)` returns `acc`. A function with only a two-argument arity doesn't. For your own, `completing` adds it, optionally with a finishing function:
 
 ```clojure
 (transduce (map inc) (completing + str) 0 [1 2])   ;; => "5"

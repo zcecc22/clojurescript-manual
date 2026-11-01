@@ -132,13 +132,14 @@ If any call rejects, `Promise.all` rejects, but the other workers keep running t
 
 ```clojure
 (defn ^:async retry
-  "Calls (f) until it resolves, at most `attempts` times, doubling the delay each time."
-  [f {:keys [attempts base-ms] :or {attempts 3 base-ms 10}}]
+  "Calls (f) until it resolves, at most `attempts` times, doubling the delay each time.
+  An error for which (retry? e) is false is rethrown immediately."
+  [f {:keys [attempts base-ms retry?] :or {attempts 3 base-ms 10 retry? (constantly true)}}]
   (loop [n 1]
     (let [r (try
               {:ok (await (f))}
               (catch :default e
-                (if (< n attempts) {:retry e} (throw e))))]
+                (if (and (< n attempts) (retry? e)) {:retry e} (throw e))))]
       (if (contains? r :ok)
         (:ok r)
         (do (await (tp/setTimeout (* base-ms (js/Math.pow 2 (dec n)))))
@@ -153,7 +154,7 @@ A flaky operation that fails twice and then succeeds:
 
 `recur` can't appear inside `try` or `catch` (the compiler says `Can't recur here`), so the `try` returns a map saying what to do and the decision happens outside it. That's a pattern worth remembering whenever a loop needs to recover from errors.
 
-Only retry operations that are safe to repeat, and only for errors that might be transient: a timeout or a 503, not a 400. In production, add jitter to the delay so many clients don't retry in lockstep.
+Only retry operations that are safe to repeat, and only for errors that might be transient: a timeout or a 503, not a 400. Pass a `:retry?` predicate to say which errors those are (chapter 25 has one for HTTP). In production, add jitter to the delay so many clients don't retry in lockstep.
 
 ---
 
@@ -187,7 +188,7 @@ A server should stop accepting work, finish what's in flight, release resources,
 ```clojure
 (defn shutdown! [server]
   (prn :shutting-down)
-  (.close server (fn [] (prn :closed) (js/process.exit 0)))
+  (.close server (fn [] (prn :closed)))    ; then release anything else you hold
   ;; force exit if connections don't drain in time
   (.unref (js/setTimeout #(js/process.exit 1) 10000)))
 
@@ -196,7 +197,7 @@ A server should stop accepting work, finish what's in flight, release resources,
     (.once js/process sig #(shutdown! server))))
 ```
 
-`.unref` on the timer means it won't keep the process alive by itself. Node exits when nothing is left on the event loop: no timers, sockets or pending I/O. A process that won't exit is holding something open. Chapter 24 applies this to an HTTP server.
+There's no `process.exit` on the success path. Once the server is closed and nothing else is open, Node exits by itself with code 0, after flushing output, which `process.exit` doesn't wait for (chapter 26). `.unref` on the deadline timer means it won't keep the process alive by itself. Node exits when nothing is left on the event loop: no timers, sockets or pending I/O. A process that won't exit is holding something open. Chapter 24 applies this to an HTTP server.
 
 ---
 

@@ -11,7 +11,7 @@ The idiomatic error is an `ex-info`: a message plus a map of data:
 ```clojure
 (defn withdraw [balance amount]
   (if (> amount balance)
-    (throw (ex-info "Insufficient funds"
+    (throw (ex-info "insufficient funds"
                     {:type :insufficient-funds :balance balance :amount amount}))
     (- balance amount)))
 
@@ -19,7 +19,7 @@ The idiomatic error is an `ex-info`: a message plus a map of data:
   (withdraw 10 50)
   (catch :default e
     [(ex-message e) (ex-data e)]))
-;; => ["Insufficient funds" {:type :insufficient-funds, :balance 10, :amount 50}]
+;; => ["insufficient funds" {:type :insufficient-funds, :balance 10, :amount 50}]
 ```
 
 The data map is where the useful information goes: what failed, with what inputs, and a `:type` keyword the caller can branch on. Keep the message for humans and the data for code.

@@ -70,7 +70,8 @@ The round trip doesn't come back the same:
 | set `#{:a}` | `["a"]` | a vector |
 | `js/Date` | ISO string | a string |
 | namespaced key `:user/id` | `"id"` | collides with other `id` keys (chapter 09) |
-| function, `undefined` | silently dropped | gone |
+| function | silently dropped | gone |
+| `undefined` | `null` (via `clj->js`) | `nil` |
 | `##NaN`, `##Inf` | `null` | `nil` |
 
 ```clojure
@@ -78,7 +79,7 @@ The round trip doesn't come back the same:
 ;; => {:status "active"}
 
 (js/JSON.stringify (clj->js {:f (fn [] 1) :u js/undefined :nan ##NaN}))
-;; => "{\"u\":null,\"nan\":null}"     :f vanished
+;; => "{\"u\":null,\"nan\":null}"     :f vanished, undefined became null
 ```
 
 So at a JSON boundary, convert values explicitly: keywords back from strings for known enum fields, dates parsed from strings. A spec conformer (chapter 19) or a small decoding function per message type keeps this in one place.
