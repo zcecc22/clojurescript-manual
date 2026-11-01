@@ -175,14 +175,35 @@ The compiler warns when it can see the problem, as with these literal strings. V
 
 In a release build the Closure Compiler renames properties to save space. That's safe for ClojureScript code, but a JavaScript object's property names have to survive, or `(.-userName user)` would read a renamed property that doesn't exist.
 
-shadow-cljs handles this with **externs inference**: it tracks which values are JavaScript and preserves the property names you access on them. In practice it works without help. In a verified release build, `(.-userName user)` on a parsed JSON object kept its name, with no warnings and no annotations.
+shadow-cljs handles this with **externs inference**: it tracks which values are JavaScript and preserves the property names you access on them. Usually it works without help. In a verified release build, `(.-userName user)` on a parsed JSON object kept its name, with no annotations.
 
-When shadow-cljs can't tell, it emits an inference warning. The fix is a `^js` hint on the binding:
+When shadow-cljs can't tell what a value is, it says so:
+
+```
+------ WARNING #1 - :infer-warning ------
+ Cannot infer target type in expression (. (Readable.from x) -readableObjectMode)
+```
+
+**That warning means the release build is broken.** In that build `.-readableObjectMode` was renamed to `.Tb`. The development build ran correctly and the release build read `undefined`. The fix is a `^js` hint on the binding, which tells the compiler the value is a JavaScript object:
 
 ```clojure
+(defn mode [x]
+  (let [^js r (.from Readable x)]
+    (.-readableObjectMode r)))
+
 (defn user-name [^js user]
   (.-userName user))
 ```
+
+> ⚠️ **Gotcha:** One renaming bug produced **no warning at all**. Calling a static method on a `:refer`'d class with the dotted-symbol form, `(Readable.from xs)`, compiled cleanly and failed in the release build with `Cannot read properties of undefined (reading 'from')`, because `Readable` itself was renamed. These forms all survived the same release build:
+>
+> ```clojure
+> (.from Readable xs)             ; method call on the referred class
+> (stream/Readable.from xs)       ; dotted access through an :as alias
+> (EventEmitter.)                 ; constructing a referred class
+> ```
+>
+> Use `(.method Class args)` for static methods, and test the `release` build, not only the development build.
 
 `goog.object/get` with a string key is always safe, because string keys are never renamed. Chapter 21 covers release builds in detail.
 
@@ -196,4 +217,5 @@ When shadow-cljs can't tell, it emits an inference warning. The fix is a `^js` h
 - Use `goog.object` for computed property names, `aget`/`aset` only for arrays.
 - Use `prn` for ClojureScript values, never `console.log`.
 - Parse strings to numbers at the edge. Arithmetic won't complain.
-- Fix every externs inference warning with a `^js` hint.
+- Fix every externs inference warning with a `^js` hint. It means the release build is broken.
+- Call static methods as `(.method Class args)`, and run the release build before shipping.

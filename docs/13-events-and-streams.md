@@ -93,7 +93,7 @@ Write this helper once and use it everywhere. Because it awaits each `.next`, th
 ```clojure
 (:require ["node:stream" :refer [Readable]])
 
-(await (iterate-async (Readable.from #js [1 2 3]) #(prn :chunk %)))
+(await (iterate-async (.from Readable #js [1 2 3]) #(prn :chunk %)))
 ;; prints: :chunk 1, :chunk 2, :chunk 3
 ```
 
@@ -159,10 +159,10 @@ A transform function receives a chunk (a `Buffer` by default) and calls `cb` wit
 
 ### Object mode
 
-`Readable.from` over a collection of non-strings creates an **object-mode** stream, where each chunk is one value. ClojureScript values pass through unchanged:
+`(.from Readable coll)` over a collection of non-strings creates an **object-mode** stream, where each chunk is one value. ClojureScript values pass through unchanged:
 
 ```clojure
-(await (iterate-async (Readable.from #js [{:a 1}]) #(prn %)))
+(await (iterate-async (.from Readable #js [{:a 1}]) #(prn %)))
 ;; prints: {:a 1}
 ```
 
